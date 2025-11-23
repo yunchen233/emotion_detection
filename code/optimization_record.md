@@ -11,7 +11,7 @@ datagen = ImageDataGenerator(
     fill_mode='nearest'
 )  
 3.增加CNN架构的滤波器（翻倍），增强特征提取能力和模型容量
-![img](./images/step1.pnd)  
+![img](./images/step1.jpg)  
 学习效果：  
 训练准确率: 从~20%上升到~55%  
 验证准确率: 从~20%上升到~50%  
