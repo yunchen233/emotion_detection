@@ -6,81 +6,70 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import to_categorical
 import matplotlib.pyplot as plt
 import os
+from tensorflow.keras.preprocessing.image import ImageDataGenerator#用于图像数据增强（旋转，放缩等）
 
-# --- 1. 准备工作：定义文件路径和参数 ---      
-
-
+# --- 1. 准备工作：定义文件路径和参数 ---
 script_path = os.path.abspath(__file__)
 script_dir = os.path.dirname(script_path)
 project_root = os.path.dirname(script_dir)
 train_csv_path = os.path.join(project_root, 'data', 'train.csv')
 model_save_path = os.path.join(project_root, 'model', 'emotion_model.h5')
-
+val_csv_path = os.path.join(project_root, 'data', 'val.csv')
 # 图像尺寸和类别数
 IMAGE_WIDTH, IMAGE_HEIGHT = 48, 48
-NUM_CLASSES = 7  
-
+NUM_CLASSES = 7
 # --- 2. 数据加载与预处理 ---
-
 print("--- 开始加载和预处理数据 ---")
-
 # 读取CSV文件
 df = pd.read_csv(train_csv_path)
-
 # 提取像素数据并转换为图像数组
 # 我们需要将其分割成单个数字，然后转换为48x48的数组
 pixels = df['pixels'].apply(lambda x: np.array(x.split(), dtype='float32'))
-
 # 将所有图像数据堆叠成一个大的numpy数组，并添加通道维度
 # 最终形状为 (样本数, 48, 48, 1)，1代表灰度图
 X_train = np.stack(pixels, axis=0).reshape(-1, IMAGE_WIDTH, IMAGE_HEIGHT, 1)
-
 # 提取情绪标签
 y_train = df['emotion'].values
-
 # 将标签转换为独热编码 (One-Hot Encoding)
-
 y_train = to_categorical(y_train, num_classes=NUM_CLASSES)
-
 # 数据归一化：将像素值从 [0, 255] 缩放到 [-1, 1]（这一步是增加效率的）
 X_train = (X_train / 255.0) * 2 - 1
-
+#加载验证集
+df_val = pd.read_csv(val_csv_path)
+pixels_val = df_val['pixels'].apply(lambda x: np.array(x.split(), dtype='float32'))
+X_val = np.stack(pixels_val, axis=0).reshape(-1, IMAGE_WIDTH, IMAGE_HEIGHT, 1)
+y_val = to_categorical(df_val['emotion'].values, num_classes=NUM_CLASSES)
+X_val = (X_val / 255.0) * 2 - 1
 print("--- 数据加载和预处理完成 ---")
 print(f"训练集图像数据形状: {X_train.shape}")
 print(f"训练集标签数据形状: {y_train.shape}")
-
-
+print(f"验证集图像数据形状: {X_val.shape}")
+print(f"验证集标签数据形状: {y_val.shape}")
 # --- 3. 构建CNN模型 ---
-
 print("--- 开始构建模型 ---")
-
-model = Sequential([
+model = Sequential([#创建顺序模型
     # 第一卷积块
-    Conv2D(32, (3, 3), activation='relu', padding='same', input_shape=(IMAGE_WIDTH, IMAGE_HEIGHT, 1)),
-    BatchNormalization(),
-    MaxPooling2D((2, 2)),
-    Dropout(0.25),
-
+    Conv2D(64, (3, 3), activation='relu', padding='same', input_shape=(IMAGE_WIDTH, IMAGE_HEIGHT, 1)),
+    BatchNormalization(),#批归一化
+    MaxPooling2D((2, 2)),#最大池化：保留最显著的特征，对特征位置变化不敏感，大幅减少参数和计算量
+    Dropout(0.25),#随机丢弃神经元，迫使每个神经元都要有用，防止过于依赖某一特征
     # 第二卷积块
-    Conv2D(64, (3, 3), activation='relu', padding='same'),
+    Conv2D(128, (3, 3), activation='relu', padding='same'),#卷积核数量从32增加到64，学习更复杂的特征
     BatchNormalization(),
     MaxPooling2D((2, 2)),
     Dropout(0.25),
-
     # 第三卷积块
-    Conv2D(128, (3, 3), activation='relu', padding='same'),
+    Conv2D(256, (3, 3), activation='relu', padding='same'),#卷积核数量增加到128，学习高级特征
     BatchNormalization(),
     MaxPooling2D((2, 2)),
     Dropout(0.25),
-
     # 分类头
-    Flatten(),
-    Dense(512, activation='relu'),
+    Flatten(),#展平层：空间特征转化为特征向量
+    Dense(1024, activation='relu'),#全链接层
     BatchNormalization(),
     Dropout(0.5),
-    Dense(NUM_CLASSES, activation='softmax')
+    Dense(NUM_CLASSES, activation='softmax')#输出层
 ])
-
 # 编译模型
 # - optimizer: Adam优化器，学习率为0.001
 # - loss: 多分类交叉熵损失函数，适合独热编码标签
@@ -90,37 +79,37 @@ model.compile(
     loss='categorical_crossentropy',
     metrics=['accuracy']
 )
-
 # 打印模型结构摘要
 model.summary()
 print("--- 模型构建完成 ---")
-
-
-# --- 4. 训练模型 ---                     加入已有验证集那块看不懂，直接改了，把0.1的训练数据当验证集使了之后再说吧
-
+print("--- 配置数据增强 ---")
+datagen = ImageDataGenerator(
+    rotation_range=30,        # 旋转±30度
+    width_shift_range=0.2,    # 水平平移
+    height_shift_range=0.2,   # 垂直平移
+    shear_range=0.2,          # 剪切变换（模拟歪头）
+    zoom_range=0.2,           # 随机缩放
+    horizontal_flip=True,     # 水平翻转
+    fill_mode='nearest'
+)
+print("--- 数据增强配置完成 ---")
+# --- 4. 训练模型 ---
 print("--- 开始训练模型 ---")
-
 # 设置训练参数
 BATCH_SIZE = 64
 EPOCHS = 50 # 训练轮次，可以根据电脑性能和训练效果调整
-
 # 开始训练
 history = model.fit(
-    X_train, y_train,
-    batch_size=BATCH_SIZE,
+    datagen.flow(X_train, y_train, batch_size=BATCH_SIZE),
     epochs=EPOCHS,
-    validation_split=0.1, #改在这里了，拔出来当验证集
+    validation_data=(X_val, y_val),
     shuffle=True
 )
-
 print("--- 模型训练完成 ---")
 
-
 # --- 5. 保存模型和训练结果 ---
-
 # 创建模型保存目录（如果不存在）
 os.makedirs(os.path.dirname(model_save_path), exist_ok=True)
-
 # 保存训练好的模型
 model.save(model_save_path)
 print(f"模型已成功保存到: {model_save_path}")
@@ -131,8 +120,8 @@ def plot_training_history(history, save_path):
 
     # 绘制准确率曲线
     plt.subplot(1, 2, 1)
-    plt.plot(history.history['accuracy'], label='训练准确率')
-    plt.plot(history.history['val_accuracy'], label='验证准确率')
+    plt.plot(history.history['accuracy'], label='train_accuracy')
+    plt.plot(history.history['val_accuracy'], label='val_accuracy')
     plt.title('Model Accuracy')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy')
@@ -140,8 +129,8 @@ def plot_training_history(history, save_path):
 
     # 绘制损失曲线
     plt.subplot(1, 2, 2)
-    plt.plot(history.history['loss'], label='训练损失')
-    plt.plot(history.history['val_loss'], label='验证损失')
+    plt.plot(history.history['loss'], label='train_loss')
+    plt.plot(history.history['val_loss'], label='val_loss')
     plt.title('Model Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
@@ -150,7 +139,7 @@ def plot_training_history(history, save_path):
     plt.tight_layout()
     plt.savefig(save_path)
     plt.show()
-
 # 保存训练曲线图片
 plot_training_history(history, '../model/training_curve.png')
 print("训练曲线已保存到: ../model/training_curve.png")
+
