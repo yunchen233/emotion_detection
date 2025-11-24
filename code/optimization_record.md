@@ -38,34 +38,33 @@ def channel_attention_module(input_tensor, reduction_ratio=16):
     fc2 = Dense(channels, activation='sigmoid')(fc1)
     # 将学习到的通道权重与原始输入相乘，实现特征重标定
     return Multiply()([input_tensor, fc2])  
-# 使用函数式API构建模型，以便添加注意力机制，顺序模型无法支持这样的机制
+#使用函数式API构建模型，以便添加注意力机制，顺序模型无法支持这样的机制
 input_tensor = tf.keras.Input(shape=(IMAGE_WIDTH, IMAGE_HEIGHT, 1))
-
-# 第一卷积块
+#第一卷积块
 x=Conv2D(64, (3, 3), activation='relu', padding='same')(input_tensor)
 x=BatchNormalization()(x)#批归一化
 x = channel_attention_module(x)  # 添加通道注意力机制
 x=MaxPooling2D((2, 2))(x)#最大池化：保留最显著的特征，对特征位置变化不敏感，大幅减少参数和计算量
 x=Dropout(0.25)(x)#随机丢弃神经元，迫使每个神经元都要有用，防止过于依赖某一特征
-# 第二卷积块
+#第二卷积块
 x=Conv2D(128, (3, 3), activation='relu', padding='same')(x)#卷积核数量从32增加到64，学习更复杂的特征
 x=BatchNormalization()(x)
 x = channel_attention_module(x)
 x=MaxPooling2D((2, 2))(x)
 x=Dropout(0.25)(x)
-# 第三卷积块
+#第三卷积块
 x=Conv2D(256, (3, 3), activation='relu', padding='same')(x)#卷积核数量增加到128，学习高级特征
 x=BatchNormalization()(x)
 x = channel_attention_module(x)
 x=MaxPooling2D((2, 2))(x)
 x=Dropout(0.25)(x)
-# 分类头
+#分类头
 x=Flatten()(x)#展平层：空间特征转化为特征向量
 x=Dense(1024, activation='relu')(x)#全链接层
 x=BatchNormalization()(x)
 x=Dropout(0.5)(x)
 output_tensor = Dense(NUM_CLASSES, activation='softmax')(x)#输出层
-# 创建模型
+#创建模型
 model = Model(inputs=input_tensor, outputs=output_tensor)  
 2.1024个神经元的全连接层参数过多，对于7分类任务严重过参数化，容易记住训练数据而不是学习泛化特点  
 3.学习策略不是根据模型的实际情况做动态调整，不够激进  
