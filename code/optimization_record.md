@@ -136,5 +136,6 @@ def cbam_block(input_tensor, reduction_ratio=16):
     x = spatial_attention(x)
     return x  
 学习效果：没有提高，反而使准确律降低了一个百分点  
+![img](images/step4.jpg)  
 原因分析：1.数据库不够庞大，学到了噪声而非模式  
 2.引入额外非线性，训练曲线震荡，收敛更慢，最终性能可能更差
