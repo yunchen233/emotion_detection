@@ -87,4 +87,54 @@ STEP3:
 ![img](images/step3.jpg)  
 总结：
 准确率相对提升（FER2013的人类识别准确率在65%-72%之间）。
-后续优化想法：1.增加注意力机制2.针对FER2013的特点对厌恶等情绪进行权重调整3.用FER+作为升级版数据集
+后续优化想法：1.增加注意力机制2.针对FER2013的特点对厌恶等情绪进行权重调整3.用FER+作为升级版数据集  
+
+STEP4:
+1.引入CBAM注意力机制：  
+def cbam_block(input_tensor, reduction_ratio=16):
+    """
+    CBAM注意力机制：输入特征图 → 通道注意力 → 空间注意力 → 增强后的特征图
+    通道注意力：决定"关注哪些特征"：为64个通道生成权重
+    空间注意力：决定"关注哪个位置"： 为48×48个位置生成权重
+    """
+    def channel_attention(input_tensor, reduction_ratio=reduction_ratio):
+        # 获取通道数
+        channels = input_tensor.shape[-1]
+        avg_pool = GlobalAveragePooling2D()(input_tensor)#平均池化：保留整体趋势
+        max_pool = GlobalMaxPooling2D()(input_tensor)#最大池化：保留最显著特征
+        # 共享的多层感知机
+        # 平均池化分支
+        avg_out = Dense(channels // reduction_ratio, activation='relu')(avg_pool)#缩减通道数的全连接层，提取重要信息
+        avg_out = Dense(channels, activation='sigmoid')(avg_out)#恢复通道数的全连接层
+        # 最大池化分支
+        max_out = Dense(channels // reduction_ratio, activation='relu')(max_pool)
+        max_out = Dense(channels, activation='sigmoid')(max_out)
+        # 合并两个分支
+        cbam_feature = Add()([avg_out, max_out])
+        cbam_feature = Activation('sigmoid')(cbam_feature)#得到每个通道的权重
+        # 重塑为 [batch_size, 1, 1, channels]
+        cbam_feature = Reshape((1, 1, channels))(cbam_feature)
+        # 应用注意力权重
+        return Multiply()([input_tensor, cbam_feature])
+    def spatial_attention(input_tensor):
+        # 使用Lambda层进行通道维度的池化
+        avg_pool = Lambda(lambda x: K.mean(x, axis=3, keepdims=True))(input_tensor)
+        max_pool = Lambda(lambda x: K.max(x, axis=3, keepdims=True))(input_tensor)
+        # 拼接平均池化和最大池化结果
+        concat = Concatenate(axis=3)([avg_pool, max_pool])
+        # 使用卷积层生成空间注意力图
+        conv = Conv2D(
+            filters=1,
+            kernel_size=(7, 7),
+            padding='same',
+            activation='sigmoid'
+        )(concat)
+        # 应用空间注意力权重
+        return Multiply()([input_tensor, conv])
+    # 依次应用两个注意力
+    x = channel_attention(input_tensor)
+    x = spatial_attention(x)
+    return x  
+学习效果：没有提高，反而使准确律降低了一个百分点  
+原因分析：1.数据库不够庞大，学到了噪声而非模式  
+2.引入额外非线性，训练曲线震荡，收敛更慢，最终性能可能更差
