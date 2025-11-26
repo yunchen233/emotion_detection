@@ -1,14 +1,23 @@
 import cv2
 import numpy as np
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 from tensorflow.keras.models import load_model
 from mtcnn import MTCNN
 import os
+import sys
+from fpdf import FPDF
+
+# 确保能导入同级目录的分析脚本
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from emotion_fluctuation_analysis import main as fluctuation_main
+from emotion_transition_analysis import analyze_and_plot as transition_analyze
 
 # --- 模型 ---
 model = load_model('../model/emotion_model_v2.h5') 
 emotion_labels = ['Angry', 'Disgusted', 'Scared', 'Happy', 'Sad', 'Surprised', 'Calm']
+
+CAPTURE_DURATION = 2 * 60# 数据采集时间限制（2分钟）
 
 # --- MTCNN 人脸检测 ---
 detector = MTCNN()
@@ -28,7 +37,15 @@ if write_header:
 # --- 摄像头 ---
 cap = cv2.VideoCapture(0) 
 
+# 记录开始时间
+start_time = datetime.now()
+end_time = start_time + timedelta(seconds=CAPTURE_DURATION)
+
 while cap.isOpened():
+    # 检查是否超过采集时间
+    if datetime.now() >= end_time:
+        print("已达到2分钟数据采集上限，自动停止")
+        break
     ret, frame = cap.read()
     if not ret: break
 
@@ -94,3 +111,89 @@ while cap.isOpened():
 cap.release()
 csv_file.close()
 cv2.destroyAllWindows()
+result_dir = "../result"
+os.makedirs(result_dir, exist_ok=True)
+print("生成情绪波动分析图...")
+fluctuation_main()
+print("生成情绪转移矩阵图...")
+transition_img_path = transition_analyze()
+
+# --------------------------
+# PDF生成部分（放在最后，不改变前面任何顺序）
+# --------------------------
+# 1. 字体配置（嵌入项目的宋体）
+# 字体路径
+font_relative_path = "../fonts/STFANGSO.TTF"  # 相对于当前code目录的路径
+font_path = os.path.abspath(font_relative_path)  # 转为绝对路径
+
+# 2. 生成PDF报告
+print("生成PDF分析报告...")
+pdf = FPDF()
+pdf.add_page()
+
+# 加载嵌入字体
+font_name = "STFANGSO"
+if os.path.exists(font_path):
+    pdf.add_font(font_name, '', font_path, uni=True)
+    print("中文字体加载成功")
+else:
+    font_name = "Arial"  # 字体丢失时降级为英文
+    print(f"警告：未找到字体文件 {font_path}，将使用英文显示")
+
+# 添加标题
+pdf.set_font(font_name, '', 16)
+if font_name == "STFANGSO":
+    pdf.cell(0, 15, '实时情绪检测分析报告', 0, 1, 'C')
+else:
+    pdf.cell(0, 15, 'Real-Time Emotion Detection Report', 0, 1, 'C')
+pdf.ln(2)
+
+# 添加采集信息
+pdf.set_font(font_name, '', 12)
+end_time = datetime.now()
+if font_name == "STFANGSO":
+    pdf.cell(0, 10, f"采集时间：{start_time.strftime('%Y-%m-%d %H:%M:%S')} 至 {end_time.strftime('%Y-%m-%d %H:%M:%S')}", 0, 1)
+    pdf.cell(0, 10, f"采集时长：{int((end_time - start_time).total_seconds())} 秒", 0, 1)
+else:
+    pdf.cell(0, 10, f"Collection Time: {start_time.strftime('%Y-%m-%d %H:%M:%S')} to {end_time.strftime('%Y-%m-%d %H:%M:%S')}", 0, 1)
+    pdf.cell(0, 10, f"Duration: {int((end_time - start_time).total_seconds())} seconds", 0, 1)
+pdf.ln(2)
+
+# 添加情绪波动图
+pdf.set_font(font_name, '', 14)
+fluctuation_img_path = os.path.join(result_dir, "emotion_fluctuation_curve.png")
+if font_name == "STFANGSO":
+    pdf.cell(0, 12, '情绪波动趋势图', 0, 1)
+else:
+    pdf.cell(0, 12, 'Emotion Fluctuation Trend', 0, 1)
+if os.path.exists(fluctuation_img_path):
+    pdf.image(fluctuation_img_path, x=10, w=190)
+else:
+    pdf.set_font(font_name, '', 12)
+    if font_name == "STFANGSO":
+        pdf.cell(0, 10, f"⚠️ 未找到波动图：{fluctuation_img_path}", 0, 1)
+    else:
+        pdf.cell(0, 10, f"⚠️ Fluctuation chart not found: {fluctuation_img_path}", 0, 1)
+pdf.ln(4)
+
+# 添加情绪转移图
+pdf.set_font(font_name, '', 14)
+if font_name == "STFANGSO":
+    pdf.cell(0, 12, '情绪转移概率矩阵', 0, 1)
+else:
+    pdf.cell(0, 12, 'Emotion Transition Matrix', 0, 1)
+if os.path.exists(transition_img_path):
+    pdf.image(transition_img_path, x=10, w=190)
+else:
+    pdf.set_font(font_name, '', 12)
+    if font_name == "STFANGSO":
+        pdf.cell(0, 10, f"⚠️ 未找到转移图：{transition_img_path}", 0, 1)
+    else:
+        pdf.cell(0, 10, f"⚠️ Transition chart not found: {transition_img_path}", 0, 1)
+
+# 保存PDF
+pdf_path = os.path.join(result_dir, "emotion_analysis_report.pdf")
+pdf.output(pdf_path)
+print(f"PDF报告已保存至：{pdf_path}")
+print("所有操作完成！")
+
