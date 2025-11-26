@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 # 字体回退：无 SimHei 时优先用系统中文字体，避免中文乱码
-matplotlib.rcParams['font.sans-serif'] = ['PingFang SC', 'STHeiti', 'Arial Unicode MS']
+matplotlib.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'PingFang SC', 'DejaVu Sans']
 matplotlib.rcParams['axes.unicode_minus'] = False
 
 # 统一使用与实时检测一致的情绪顺序
@@ -85,38 +85,6 @@ def compute_transition_matrices(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Data
     prob_df = pd.DataFrame(prob_matrix, index=EMOTION_LABELS, columns=EMOTION_LABELS)
     return count_df, prob_df
 
-
-def plot_timeline(ax, df: pd.DataFrame) -> None:
-    """绘制离散情绪时间轴散点图。"""
-    ax.scatter(df["time"], df["emotion_code"], c=df["emotion_code"], cmap="tab20", s=24)
-    ax.set_title("情绪时间轴（离散）")
-    ax.set_xlabel("时间")
-    ax.set_ylabel("情绪类别")
-    ax.set_yticks(range(len(EMOTION_LABELS)))
-    ax.set_yticklabels(EMOTION_LABELS)
-    ax.grid(True, linestyle="--", alpha=0.3)
-
-    # 调细时间刻度：更密的刻度、更短的可视范围
-    span_seconds = max((df["time"].max() - df["time"].min()).total_seconds(), 0)
-    target_ticks = 15  # 目标刻度数量，更细的刻度
-    if span_seconds <= 900:  # 15 分钟内用秒刻度
-        interval = max(1, int(np.ceil(span_seconds / target_ticks)))
-        ax.xaxis.set_major_locator(mdates.SecondLocator(interval=interval))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
-    else:  # 更长的用分钟刻度
-        span_minutes = span_seconds / 60
-        interval = max(1, int(np.ceil(span_minutes / target_ticks)))
-        ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=interval))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-    fig = ax.get_figure()
-    fig.autofmt_xdate()
-
-    # 缩短跨度：两端留极少的空白，进一步“放大”视图
-    pad = max(span_seconds * 0.005, 0.5)  # 至少 0.5 秒留白
-    ax.set_xlim(df["time"].min() - pd.Timedelta(seconds=pad),
-                df["time"].max() + pd.Timedelta(seconds=pad))
-
-
 def plot_transition_heatmap(ax, prob_df: pd.DataFrame) -> None:
     """绘制情绪转移概率热力图。"""
     im = ax.imshow(prob_df, cmap="Blues", vmin=0, vmax=1)
@@ -160,9 +128,8 @@ def analyze_and_plot(csv_path: str = None, save_dir: str = None) -> str:
         os.makedirs(save_dir, exist_ok=True)
 
     save_path = os.path.join(save_dir, "emotion_transition_analysis.png")
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    plot_timeline(axes[0], df)
-    plot_transition_heatmap(axes[1], prob_df)
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    plot_transition_heatmap(ax, prob_df)
     plt.tight_layout()
     plt.savefig(save_path, dpi=300)
     plt.close(fig)
