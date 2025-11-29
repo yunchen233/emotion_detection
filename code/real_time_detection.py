@@ -40,16 +40,20 @@ cap = cv2.VideoCapture(0)
 # 记录开始时间
 start_time = datetime.now()
 end_time = start_time + timedelta(seconds=CAPTURE_DURATION)
+is_collecting = True  # 采集状态标志
 
 while cap.isOpened():
-    # 检查是否超过采集时间
-    if datetime.now() >= end_time:
-        print("已达到2分钟数据采集上限，自动停止")
-        break
     ret, frame = cap.read()
     if not ret: break
 
     frame = cv2.flip(frame, 1)
+    current_time = datetime.now()
+
+    # 检查是否超过采集时间，停止采集但不关闭摄像头
+    if current_time >= end_time and is_collecting:
+        print("已达到2分钟数据采集上限，停止数据采集（摄像头保持打开）")
+        is_collecting = False  # 关闭采集状态
+        csv_file.close()  # 停止采集后关闭CSV文件
 
     # MTCNN 需要 RGB
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -89,9 +93,10 @@ while cap.isOpened():
         pred_confidence = round(float(np.max(pred_prob)) * 100, 2)
 
         # --- 存入 CSV ---
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        csv_writer.writerow([now_str, pred_emotion])
-        csv_file.flush()
+        if is_collecting:
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            csv_writer.writerow([now_str, pred_emotion])
+            csv_file.flush()
 
         # --- 画框 ---
         cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
@@ -109,7 +114,8 @@ while cap.isOpened():
         break
 
 cap.release()
-csv_file.close()
+if is_collecting:
+    csv_file.close()
 cv2.destroyAllWindows()
 result_dir = "../result"
 os.makedirs(result_dir, exist_ok=True)
