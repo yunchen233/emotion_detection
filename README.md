@@ -2,7 +2,8 @@ check_package.py用于检测环境是否配齐(TensorFlow，mtcnn，opencv)
 real_time_detection.py摄像头相关（现已完成基本功能  
 emotion_fluctuation_analysis.py情绪变化曲线（待优化）  
 emotion_transition_analysis.py情绪转移矩阵  
-train_model.py模型主体
+train_model.py模型主体  
+增加了一个真实的采集数据供曲线优化测试  
 TODO：  
 1.项目网页生成  
 2.数据集更新（zy）  
