@@ -11,6 +11,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau  # 新�
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 import os
+from sklearn.utils.class_weight import compute_class_weight#导入计算类别权重工具
 
 # --- 1. 路径与参数配置（新增测试集路径） ---
 # 获取项目根目录路径
@@ -26,7 +27,7 @@ model_save_path = os.path.join(project_root, 'model', 'emotion_model_v2.h5')
 
 # 图像参数：48x48 灰度图
 IMAGE_WIDTH, IMAGE_HEIGHT = 48, 48
-NUM_CLASSES = 7  # 情绪类别：愤怒、厌恶、恐惧、开心、悲伤、惊讶、平静
+NUM_CLASSES = 8  # 情绪类别：愤怒、厌恶、恐惧、开心、悲伤、惊讶、平静,新增：轻蔑
 
 
 # --- 2. 数据加载与预处理（完善测试集处理） ---
@@ -57,7 +58,20 @@ print("--- 数据加载和预处理完成 ---")
 print(f"训练集: {X_train.shape} 样本，标签: {y_train.shape}")
 print(f"验证集: {X_val.shape} 样本，标签: {y_val.shape}")
 print(f"测试集: {X_test.shape} 样本，标签: {y_test.shape}")  # 新增测试集信息
-
+# 新增：计算类别权重（解决类别不平衡问题）
+# 将one-hot编码的标签转换为整数标签（因为compute_class_weight需要整数标签）
+y_train_labels = np.argmax(y_train, axis=1)
+# 计算权重：'balanced'模式会自动根据样本比例计算权重（样本少的类别权重高）
+class_weights = compute_class_weight(
+    class_weight='balanced',
+    classes=np.arange(NUM_CLASSES),  # 类别范围：0到NUM_CLASSES-1
+    y=y_train_labels  # 训练集的整数标签
+)
+# 转换为字典格式（keras的class_weight参数需要字典类型）
+class_weight_dict = {i: class_weights[i] for i in range(NUM_CLASSES)}
+print("--- 计算得到的类别权重 ---")
+for cls, weight in class_weight_dict.items():
+    print(f"类别 {cls} 的权重: {weight:.4f}")
 
 # --- 3. 模型构建（这一部分新增残差连接，增强特征提取能力） ---
 def residual_block(x, filters, kernel_size=(3, 3)):
@@ -163,15 +177,16 @@ lr_scheduler = ReduceLROnPlateau(
 )
 
 BATCH_SIZE = 64
-EPOCHS = 70  # 最大轮次（实际会被早停截断，初次尝试在约58轮时截停）
+EPOCHS = 100  # 最大轮次
 
 # 开始训练
 history = model.fit(
     train_generator,
     epochs=EPOCHS,
-    validation_data=(X_val, y_val),  # 用验证集评估泛化能力
+    validation_data=(X_val, y_val),
     callbacks=[early_stopping, lr_scheduler],  # 训练调控
-    shuffle=True
+    shuffle=True,
+    class_weight=class_weight_dict  # 新增：应用类别权重
 )
 print("--- 模型训练完成 ---")
 
