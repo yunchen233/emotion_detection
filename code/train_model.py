@@ -12,6 +12,9 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 import os
 from sklearn.utils.class_weight import compute_class_weight#导入计算类别权重工具
+#少数样本数据增强所需库
+from sklearn.utils import shuffle
+from imblearn.over_sampling import SMOTE
 
 # --- 1. 路径与参数配置（新增测试集路径） ---
 # 获取项目根目录路径
@@ -41,7 +44,6 @@ def load_and_preprocess_data(csv_path):
     y = to_categorical(df['emotion'].values, num_classes=NUM_CLASSES)
     # 归一化
     X = (X / 255.0) * 2 - 1
-
     return X, y
 
 
@@ -57,8 +59,9 @@ X_test, y_test = load_and_preprocess_data(test_csv_path)  # 新增测试集加�
 print("--- 数据加载和预处理完成 ---")
 print(f"训练集: {X_train.shape} 样本，标签: {y_train.shape}")
 print(f"验证集: {X_val.shape} 样本，标签: {y_val.shape}")
-print(f"测试集: {X_test.shape} 样本，标签: {y_test.shape}")  # 新增测试集信息
-# 新增：计算类别权重（解决类别不平衡问题）
+print(f"测试集: {X_test.shape} 样本，标签: {y_test.shape}")
+
+# 计算类别权重
 # 将one-hot编码的标签转换为整数标签（因为compute_class_weight需要整数标签）
 y_train_labels = np.argmax(y_train, axis=1)
 # 计算权重：'balanced'模式会自动根据样本比例计算权重（样本少的类别权重高）
@@ -72,6 +75,57 @@ class_weight_dict = {i: class_weights[i] for i in range(NUM_CLASSES)}
 print("--- 计算得到的类别权重 ---")
 for cls, weight in class_weight_dict.items():
     print(f"类别 {cls} 的权重: {weight:.4f}")
+
+# 统计原始训练集中每个类别的样本量
+original_counts = np.bincount(y_train_labels)
+print("\n--- 原始训练集样本分布 ---")
+for cls, count in enumerate(original_counts):
+    print(f"类别 {cls} 的样本量: {count}")
+
+# 改进：使用SMOTE过采样（控制少数类采样比例为多数类的70%）
+print("\n--- 使用SMOTE进行过采样处理 ---")
+# 计算原始类别分布
+original_counts = np.bincount(y_train_labels)
+max_count = original_counts.max()  # 多数类的样本数量
+
+# 定义采样比例（可在50%-80%之间调整）
+sampling_ratio = 0.6  # 这里设置为多数类的60%
+
+# 构建采样策略字典：每个类别目标数量 = max(原始数量, 多数类数量 * 采样比例)
+sampling_strategy = {}
+for cls in range(NUM_CLASSES):
+    # 确保目标数量不小于原始数量（只做过采样，不做下采样）
+    target_count = max(original_counts[cls], int(max_count * sampling_ratio))
+    sampling_strategy[cls] = target_count
+
+# 打印采样目标分布
+print(f"过采样目标：少数类补充至多数类的{sampling_ratio*100}%")
+for cls, target in sampling_strategy.items():
+    print(f"类别 {cls} 目标样本量: {target} (原始: {original_counts[cls]})")
+
+# 应用带自定义策略的SMOTE
+X_train_flat = X_train.reshape(X_train.shape[0], -1)
+smote = SMOTE(
+    random_state=42,
+    k_neighbors=5,
+    sampling_strategy=sampling_strategy  # 使用自定义采样策略
+)
+X_train_resampled, y_train_resampled = smote.fit_resample(X_train_flat, y_train_labels)
+
+# 恢复图像形状并转换为独热编码
+X_train_resampled = X_train_resampled.reshape(-1, IMAGE_WIDTH, IMAGE_HEIGHT, 1)
+y_train_resampled = to_categorical(y_train_resampled, num_classes=NUM_CLASSES)
+
+# 打乱数据
+X_train, y_train = shuffle(X_train_resampled, y_train_resampled, random_state=42)
+
+# 统计处理后样本分布
+final_labels = np.argmax(y_train, axis=1)
+final_counts = np.bincount(final_labels, minlength=NUM_CLASSES)
+print("\n--- 处理后的训练集样本分布 ---")
+for cls, count in enumerate(final_counts):
+    print(f"类别 {cls} 的样本量: {count}")
+print("--- 数据平衡分布处理已完成 ---")
 
 # --- 3. 模型构建（这一部分新增残差连接，增强特征提取能力） ---
 def residual_block(x, filters, kernel_size=(3, 3)):
