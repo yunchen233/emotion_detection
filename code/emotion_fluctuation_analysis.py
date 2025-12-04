@@ -93,34 +93,90 @@ def compute_fluctuation_metrics(df: pd.DataFrame) -> dict:
 def plot_emotion_curve(df: pd.DataFrame, save_dir: str = "../result") -> str:
     """
     绘制情绪随时间变化的折线图，并保存为 PNG 文件。
-    返回：保存的文件路径
+    处理要点：
+    1. 同一秒内的多帧不会共用同一时间点，而是按采集顺序在 1 秒内均匀展开；
+    2. 如果数据点太多，自动按采集顺序拆分成多张图。
+    返回：第一张图的保存路径（其余图文件名依次编号）。
     """
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
-    save_path = os.path.join(save_dir, "emotion_fluctuation_curve.png")
+    # === 1. 确保有 emotion_code 列（数值编码） ===
+    # 如果前面已经在别的函数里构造过 emotion_code，这里不会重复做
+    if "emotion_code" not in df.columns:
+        emo_to_int = {name: idx for idx, name in enumerate(EMOTION_LABELS)}
+        df = df.copy()
+        df["emotion_code"] = df["emotion"].map(emo_to_int)
 
-    plt.figure(figsize=(12, 5))
+    # === 2. 处理时间：同一秒内按顺序“展开” ===
+    df = df.copy()
+    df["time_dt"] = pd.to_datetime(df["time"])
 
-    # 画出 emotion_code 的折线
-    plt.plot(df["time"], df["emotion_code"], marker="o", linewidth=1)
+    # 以“秒”为单位进行分组
+    df["sec"] = df["time_dt"].dt.floor("S")
 
-    # 设置坐标轴与标题
-    plt.title("情绪随时间变化曲线", fontproperties="SimHei")
-    plt.xlabel("时间", fontproperties="SimHei")
-    plt.ylabel("情绪（数值编码）", fontproperties="SimHei")
+    # 在每一秒内部：按出现顺序编号 0,1,2,...
+    df["idx_in_sec"] = df.groupby("sec").cumcount()
 
-    # 将 y 轴刻度标成情绪名称，方便阅读
-    yticks = sorted(df["emotion_code"].unique())
-    ylabels = [EMOTION_LABELS[int(v)] for v in yticks]
-    plt.yticks(yticks, ylabels, fontproperties="SimHei")
+    # 每一秒有多少帧
+    df["sec_size"] = df.groupby("sec")["time_dt"].transform("size")
 
-    plt.grid(True, linestyle="--", alpha=0.4)
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=300)
-    plt.close()
+    # 核心：在同一秒 [sec, sec+1) 区间内等间距展开
+    # 例如：一秒 3 帧 -> 0s、1/3s、2/3s
+    df["time_adj"] = df["sec"] + pd.to_timedelta(
+        df["idx_in_sec"] / df["sec_size"], unit="s"
+    )
 
-    return save_path
+    # 为安全起见，再按调整后的时间排序（基本等价于采集顺序）
+    df = df.sort_values("time_adj").reset_index(drop=True)
+
+    # === 3. 按采集顺序拆成多张图（如果太长） ===
+    # 你可以根据实际效果调这个阈值：
+    MAX_POINTS_PER_FIG = 800  # 每张图最多画多少个点
+    n = len(df)
+    n_fig = int(np.ceil(n / MAX_POINTS_PER_FIG))
+
+    save_paths = []
+
+    for fig_idx in range(n_fig):
+        start = fig_idx * MAX_POINTS_PER_FIG
+        end = min((fig_idx + 1) * MAX_POINTS_PER_FIG, n)
+        sub = df.iloc[start:end]
+
+        plt.figure(figsize=(12, 5))
+
+        # 用“展开后的时间”作为横轴
+        plt.plot(sub["time_adj"], sub["emotion_code"], marker="o", linewidth=1)
+
+        # y 轴显示中文情绪标签
+        plt.yticks(
+            ticks=list(range(len(EMOTION_LABELS))),
+            labels=EMOTION_LABELS
+        )
+
+        plt.xlabel("采集时间")
+        plt.ylabel("情绪类别")
+        if n_fig == 1:
+            title_suffix = ""
+        else:
+            title_suffix = f"（第 {fig_idx + 1} 段，共 {n_fig} 段）"
+        plt.title("情绪随时间变化曲线" + title_suffix)
+        plt.grid(True, linestyle="--", alpha=0.3)
+        plt.tight_layout()
+
+        # 多图时自动编号保存
+        if n_fig == 1:
+            fname = "emotion_fluctuation_curve.png"
+        else:
+            fname = f"emotion_fluctuation_curve_part{fig_idx + 1}.png"
+        save_path = os.path.join(save_dir, fname)
+        plt.savefig(save_path, dpi=150)
+        plt.close()
+
+        save_paths.append(save_path)
+
+    # main() 里原来只接收一个字符串，这里返回第一张图的路径即可
+    return save_paths[0] if save_paths else ""
 
 
 def main():
