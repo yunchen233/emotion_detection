@@ -130,8 +130,9 @@ def plot_emotion_curve(df: pd.DataFrame, save_dir: str = "../result") -> str:
 
         plt.figure(figsize=(12, 5))
 
-        # 核心：横轴是 frame_idx —— 永远严格递增，不会竖线重叠
-        plt.plot(sub["frame_idx"], sub["emotion_code"], marker="o", linewidth=1)
+        plt.step(sub["frame_idx"], sub["emotion_code"], where="post", linewidth=1)
+        plt.scatter(sub["frame_idx"], sub["emotion_code"], s=5)
+
 
         # y 轴显示中文标签
         plt.yticks(
