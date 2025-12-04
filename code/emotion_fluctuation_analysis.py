@@ -92,52 +92,86 @@ def compute_fluctuation_metrics(df: pd.DataFrame) -> dict:
 
 def plot_emotion_curve(df: pd.DataFrame, save_dir: str = "../result") -> str:
     """
-    绘制情绪变化曲线（横轴用采集顺序，而不是时间戳），并按点数自动拆分多张图。
-
-    满足两个需求：
-    1. 同一秒采集的 2~4 帧，不会再挤在一起，而是按采集顺序依次展开在横轴上；
-    2. 如果点太多，会自动按采集顺序拆成多张图片。
+    情绪变化可视化（优化版）：
+    - 按采集顺序排序；
+    - 将连续相同情绪的帧压缩成一段水平线，减少“竖线噪声”；
+    - 按帧数自动拆分为多张图。
     """
+
     if not os.path.exists(save_dir):
         os.makedirs(save_dir, exist_ok=True)
 
-    # === 1. 确保有 emotion_code 数值列 ===
+    # 1. 数值编码
     if "emotion_code" not in df.columns:
         emo_to_int = {name: idx for idx, name in enumerate(EMOTION_LABELS)}
         df = df.copy()
         df["emotion_code"] = df["emotion"].map(emo_to_int)
 
-    # === 2. 用“采集顺序”当横轴，而不是时间 ===
-    # 先按原始时间排序，保证顺序正确
+    # 2. 按时间排序 + 建立帧序号
     df = df.copy()
     df["time_dt"] = pd.to_datetime(df["time"])
     df = df.sort_values("time_dt").reset_index(drop=True)
-
-    # x 轴：0,1,2,... 每一帧一个点
     df["frame_idx"] = np.arange(len(df))
 
-    # === 3. 按点数拆成多张图 ===
-    MAX_POINTS_PER_FIG = 800  # 一张图最多画多少个点，可以自己调
-    n = len(df)
-    n_fig = int(np.ceil(n / MAX_POINTS_PER_FIG))
+    # 3. 按“连续相同情绪”压缩成区间
+    # seg_id 在情绪变化处 +1
+    df["seg_id"] = (df["emotion_code"] != df["emotion_code"].shift()).cumsum()
+
+    seg_df = (
+        df.groupby("seg_id")
+        .agg(
+            emotion_code=("emotion_code", "first"),
+            start_idx=("frame_idx", "min"),
+            end_idx=("frame_idx", "max"),
+        )
+        .reset_index(drop=True)
+    )
+
+    # 4. 按帧索引范围拆成多张图
+    MAX_FRAMES_PER_FIG = 400   # 比之前再收紧一点，让每张图更清爽
+    n_frames = len(df)
+    n_fig = int(np.ceil(n_frames / MAX_FRAMES_PER_FIG))
 
     save_paths = []
 
     for fig_idx in range(n_fig):
-        start = fig_idx * MAX_POINTS_PER_FIG
-        end = min((fig_idx + 1) * MAX_POINTS_PER_FIG, n)
-        sub = df.iloc[start:end]
+        fig_start = fig_idx * MAX_FRAMES_PER_FIG
+        fig_end = min((fig_idx + 1) * MAX_FRAMES_PER_FIG - 1, n_frames - 1)
 
-        plt.figure(figsize=(12, 5))
+        plt.figure(figsize=(12, 4))
 
-        plt.step(sub["frame_idx"], sub["emotion_code"], where="post", linewidth=1)
-        plt.scatter(sub["frame_idx"], sub["emotion_code"], s=5)
+        # 在当前帧区间内，绘制对应的情绪水平线
+        for _, row in seg_df.iterrows():
+            seg_start = row["start_idx"]
+            seg_end = row["end_idx"]
 
+            # 与当前图像范围没有交集就跳过
+            if seg_end < fig_start or seg_start > fig_end:
+                continue
 
-        # y 轴显示中文标签
+            # 取当前图像范围内的可见部分
+            x0 = max(seg_start, fig_start)
+            x1 = min(seg_end, fig_end)
+
+            plt.hlines(
+                y=row["emotion_code"],
+                xmin=x0,
+                xmax=x1,
+                linewidth=3,
+                alpha=0.9,
+            )
+
+        # 画出情绪切换位置的小竖线（可选，美观用）
+        # 只标在当前图像范围内
+        change_points = seg_df["start_idx"].iloc[1:]  # 第一段不用
+        for cp in change_points:
+            if fig_start <= cp <= fig_end:
+                plt.axvline(x=cp, linestyle="--", linewidth=0.5, alpha=0.3)
+
+        # y 轴标签
         plt.yticks(
             ticks=list(range(len(EMOTION_LABELS))),
-            labels=EMOTION_LABELS
+            labels=EMOTION_LABELS,
         )
 
         plt.xlabel("帧序号（随采集时间递增）")
@@ -146,10 +180,11 @@ def plot_emotion_curve(df: pd.DataFrame, save_dir: str = "../result") -> str:
         else:
             title_suffix = f"（第 {fig_idx + 1} 段，共 {n_fig} 段）"
         plt.title("情绪随采集顺序变化曲线" + title_suffix)
-        plt.grid(True, linestyle="--", alpha=0.3)
+
+        plt.grid(True, linestyle="--", alpha=0.2, axis="x")
         plt.tight_layout()
 
-        # 文件名：单图或多段
+        # 保存
         if n_fig == 1:
             fname = "emotion_fluctuation_curve.png"
         else:
@@ -158,10 +193,8 @@ def plot_emotion_curve(df: pd.DataFrame, save_dir: str = "../result") -> str:
         save_path = os.path.join(save_dir, fname)
         plt.savefig(save_path, dpi=150)
         plt.close()
-
         save_paths.append(save_path)
 
-    # 为兼容原来的调用逻辑，这里返回第一张图路径
     return save_paths[0] if save_paths else ""
 
 
