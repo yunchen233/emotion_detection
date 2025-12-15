@@ -1,0 +1,95 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="live-box">
+    <h2>🎥 实时情绪感知</h2>
+
+    <div class="video-container">
+        <!-- 视频流 -->
+        <img src="{{ url_for('video_feed') }}" width="640" height="480" style="background: #000;">
+    </div>
+
+    <div class="controls">
+        <button id="startBtn" onclick="startRecord()">🔴 开始记录</button>
+        <button id="stopBtn" onclick="stopRecord()" class="stop-btn" disabled>⬜ 停止并生成报告</button>
+    </div>
+
+    <div id="loading" style="display:none; margin-top:20px;">
+        <div class="spinner"></div>
+        <p>正在分析数据并生成精美报告，请稍候... 🍵</p>
+    </div>
+</div>
+
+<script>
+    function startRecord() {
+        // 点击开始后，按钮变色并禁用
+        var startBtn = document.getElementById('startBtn');
+        var stopBtn = document.getElementById('stopBtn');
+
+        fetch('/start_record')
+            .then(response => response.text())
+            .then(data => {
+                if (data === "started") {
+                    startBtn.disabled = true;
+                    startBtn.innerText = "正在记录情绪...";
+                    startBtn.style.backgroundColor = "#ccc";
+
+                    stopBtn.disabled = false;
+                    stopBtn.classList.add('active'); // 激活样式
+                    stopBtn.innerText = "⬜ 停止并生成报告";
+                } else {
+                    alert("启动录制失败，请刷新重试");
+                }
+            })
+            .catch(err => alert("网络错误：" + err));
+    }
+
+    function stopRecord() {
+        var loadingDiv = document.getElementById('loading');
+        var stopBtn = document.getElementById('stopBtn');
+
+        // 显示加载动画
+        stopBtn.disabled = true;
+        loadingDiv.style.display = 'block';
+
+          fetch('/stop_record')
+        .then(response => response.text())
+        .then(filename => {
+            if (filename === "error") {
+                loadingDiv.style.display = 'none';
+                // 具体的错误提示
+                alert("⚠️ 生成报告失败！\n请查看运行服务器的黑色窗口获取详细错误信息。");
+                window.location.reload();
+            } else if (filename === "empty") {
+                // 处理数据为空的情况
+                loadingDiv.style.display = 'none';
+                alert("⚠️ 采集的数据太少了！\n\nAI 需要更多数据才能分析。\n请点击开始，对着摄像头保持情绪至少 5 秒钟再停止。");
+                window.location.reload();
+            } else {
+                window.location.href = "/report/" + filename;
+            }
+        })
+            .catch(err => {
+                loadingDiv.style.display = 'none';
+                alert("请求出错：" + err);
+            });
+    }
+</script>
+
+<style>
+    /* 简单的加载旋转动画 */
+    .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 10px auto;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .stop-btn { background-color: #E6B5A8; } /* 停止按钮默认颜色 */
+    .stop-btn:disabled { background-color: #eee; color: #aaa; cursor: not-allowed; }
+    .stop-btn.active { background-color: #E6B5A8; cursor: pointer; color: white; }
+</style>
+{% endblock %}
