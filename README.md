@@ -1,14 +1,13 @@
-check_package.py用于检测环境是否配齐(TensorFlow，mtcnn，opencv)  
-real_time_detection.py摄像头相关（现已完成基本功能  
-emotion_fluctuation_analysis.py情绪变化曲线（待优化）  
-emotion_transition_analysis.py情绪转移矩阵  
-train_model.py模型主体  
-增加了一个真实的采集数据供曲线优化测试  
-TODO：  
-1.项目网页生成（可靠的ai：https://aistudio.google.com/prompts/new_chat）  
-2.数据集更新（zy）  
-3.模型调优（hyc）  
-4.情绪变化曲线优化（1.同一秒会有2-4帧，需要按照收集的顺序依次体现在图表中，而不是这几帧对应同样的时间，呈垂线状态；2.如果显示效果不好，可以考虑按照采集时间分割为多张图片）（jls）  
-5.实现上传视频接口（需要功能：保存增加了情绪实时label的视频，可以限制视频长度/大小）（Lzy)  
-6.接入语言大模型api（让ai根据采集到的情绪变化数据讲述一个故事，主要是设计prompt）（感觉可以让用户输入一个具体的情境，让ai基于这个情境上编故事，否则有点太自由）  
-7.情绪稳定度曲线（具体还没想好，要找一些文献看看怎么衡量这个指标）（hyc）  
+文件说明  
+train_model.py 模型主体，调用即可训练模型  
+confusion_matrix.py 模型评估代码-混淆矩阵（看test中每类样本模型的分拣情况）  
+real_time_detection.py 单人模式下的实时摄像头文件+pdf报告生成文件  
+ssnapshot_manager.py  抓拍器：记录每类情绪置信度最高的时刻照片截图   
+emotion_fluctuatation_analysis.py 情绪变化散点图(只支持前400帧),属于单人模式报告中  
+emotion_transition_analysis.py 情绪转移概率矩阵，属于单人模式报告中  
+api.py llm接入数据分析，单人报告模式  
+real_time_detection_double.py 双人模式下的实时摄像头+pdf报告生成文件  
+simple_tracker.py 区分用户的追踪器，按照移动距离  
+dyadic_analysis.py 双人模式的两者关系分析图表(包括时间轴彩条与重复区间的highlight，情绪占比分布柱状图，情绪共线次数矩阵，两个用户之间情绪相互影响的条件概率矩阵)  
+api_double.py  双人模式下接入的llm数据分析  
+upload_video.py  视频上传接口，只做label标注，不会产生报告（调用时直接加 --input+视频路径）
