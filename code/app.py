@@ -83,6 +83,10 @@ class VideoCamera(object):
         if self.csv_file:
             self.csv_file.close()
 
+    def close(self):
+        if self.video.isOpened():
+            self.video.release()
+
     def start_recording(self):
         self.is_recording = True
         self.start_time = datetime.datetime.now()
@@ -216,10 +220,16 @@ def history():
 def video_feed():
     def gen(camera):
         while True:
+            # 增加一个 try-catch 或者判断
+            if not camera or not camera.video.isOpened():
+                break
+
             frame = camera.get_frame()
             if frame:
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n\r\n')
+            else:
+                break  # 如果获取不到帧，退出循环
 
     return Response(gen(camera), mimetype='multipart/x-mixed-replace; boundary=frame')
 
@@ -241,7 +251,7 @@ def stop_and_generate():
 
     start_time = camera.stop_recording()
     end_time = datetime.datetime.now()
-
+    camera.close()
     # --- 生成报告逻辑 ---
     # 定义结果文件名和路径
     timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
