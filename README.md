@@ -10,4 +10,12 @@ real_time_detection_double.py 双人模式下的实时摄像头+pdf报告生成�
 simple_tracker.py 区分用户的追踪器，按照移动距离  
 dyadic_analysis.py 双人模式的两者关系分析图表(包括时间轴彩条与重复区间的highlight，情绪占比分布柱状图，情绪共线次数矩阵，两个用户之间情绪相互影响的条件概率矩阵)  
 api_double.py  双人模式下接入的llm数据分析  
-upload_video.py  视频上传接口，只做label标注，不会产生报告（调用时直接加 --input+视频路径）
+upload_video.py  视频上传接口，只做label标注，不会产生报告（调用时直接加 --input+视频路径）  
+
+网页运行方法  
+命令行运行python app.py  
+浏览器打开http://127.0.0.1:5000  
+
+api需要在系统变量里面配置  
+变量名：DASHSCOPE_API_KEY  
+b变量值：sk-49a5863a5d7449969c025f4934b1bc7e  
