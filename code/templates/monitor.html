@@ -12,7 +12,7 @@
         </h2>
         
         <div class="video-container mb-4">
-            <img src="{{ url_for('video_feed') }}" width="100%" class="img-fluid" alt="Camera Feed">
+            <img id="camFeed" src="{{ url_for('video_feed') }}" width="100%" class="img-fluid" alt="Camera Feed">
         </div>
 
         <div class="d-flex justify-content-center gap-3">
@@ -44,6 +44,8 @@
     });
 
     $('#stopBtn').click(function() {
+        $('#camFeed').attr('src', '');
+        $('#camFeed').hide(); // 或者直接隐藏视频框
         // 显示全屏 Loading
         $('#loadingOverlay').css('display', 'flex');
         
