@@ -220,7 +220,7 @@ def generate_pdf_report(start_t, end_t, target_ids, res_dir, dashboard_img):
     # --- Page 1: 封面与仪表盘 ---
     pdf.add_page()
     pdf.set_font(font_name, "", 20)
-    pdf.cell(0, 15, "双人交互分析报告 (Dyadic Report)", 0, 1, "C")
+    pdf.cell(0, 15, "双人交互分析报告", 0, 1, "C")
 
     # 基础信息
     pdf.set_font(font_name, "", 12)
@@ -309,4 +309,5 @@ if __name__ == "__main__":
     parser.add_argument("--video", type=str)
     parser.add_argument("--output", type=str)
     args = parser.parse_args()
+
     run_detection()
