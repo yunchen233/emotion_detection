@@ -1,0 +1,23 @@
+# --- Web 框架与数据库 ---
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+
+# --- 深度学习与图像处理 ---
+tensorflow>=2.10.0
+opencv-python>=4.8.0
+mtcnn>=0.1.0
+numpy>=1.24.0
+
+# --- 数据处理与机器学习辅助 ---
+pandas>=2.0.0
+scikit-learn>=1.3.0
+imbalanced-learn>=0.11.0
+scipy>=1.10.0
+
+# --- 可视化与报告生成 ---
+matplotlib>=3.7.0
+seaborn>=0.12.0
+fpdf>=1.7.2
+
+# --- 大模型 API 调用 ---
+openai>=1.0.0
