@@ -18,7 +18,7 @@ upload_video.py  视频上传接口，只做label标注，不会产生报告（�
 
 api需要在系统变量里面配置  
 变量名：DASHSCOPE_API_KEY  
-变量值：sk-49a5863a5d7449969c025f4934b1bc7e  
+变量值：自己配一下
 
 命令行终端运行pip install -r requirements.txt一键安装所有所需库  
 
