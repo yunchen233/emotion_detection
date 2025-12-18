@@ -1,0 +1,69 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 text-center">
+        <h2 class="mb-4"><i class="fas fa-cloud-upload-alt text-success"></i> 视频情绪标注</h2>
+
+        <div class="card p-5">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <input class="form-control form-control-lg" type="file" id="videoFile" name="video" accept="video/*" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">
+                    <i class="fas fa-magic me-2"></i>开始处理视频
+                </button>
+            </form>
+
+            <div id="uploadProgress" class="mt-4" style="display:none;">
+                <p class="text-muted">正在逐帧分析情绪，请勿关闭页面...</p>
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: 100%"></div>
+                </div>
+            </div>
+
+            <div id="resultArea" class="mt-4" style="display:none;">
+                <h4 class="text-success mb-3"><i class="fas fa-check-circle"></i> 处理完成</h4>
+                <a id="downloadVideoBtn" href="#" class="btn btn-success btn-lg">
+                    <i class="fas fa-download me-2"></i>下载标注视频
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $('#uploadForm').submit(function(e) {
+        e.preventDefault();
+        var formData = new FormData(this);
+
+        $('#uploadForm button').hide();
+        $('#uploadProgress').show();
+
+        $.ajax({
+            url: '/api/upload_video',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(res) {
+                $('#uploadProgress').hide();
+                if (res.status === 'success') {
+                    $('#resultArea').show();
+                    $('#downloadVideoBtn').attr('href', res.file_url);
+                } else {
+                    alert('错误: ' + res.message);
+                    $('#uploadForm button').show();
+                }
+            },
+            error: function() {
+                $('#uploadProgress').hide();
+                alert('上传或处理失败');
+                $('#uploadForm button').show();
+            }
+        });
+    });
+</script>
+{% endblock %}

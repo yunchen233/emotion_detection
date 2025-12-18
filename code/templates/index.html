@@ -1,0 +1,46 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h1 class="display-4 fw-bold mb-3" style="color: var(--text-color);">欢迎回来</h1>
+    <p class="lead text-muted mb-5">选择一个模式，开启您的情绪探索之旅</p>
+
+    <div class="row justify-content-center g-4">
+        <!-- 单人模式 -->
+        <div class="col-md-4">
+            <div class="card h-100 p-4 text-center">
+                <div class="card-body">
+                    <div class="display-1 text-primary mb-3"><i class="fas fa-user"></i></div>
+                    <h3 class="card-title">单人专注模式</h3>
+                    <p class="card-text text-muted">实时捕捉个人情绪波动，生成深度心理分析报告。</p>
+                    <a href="/monitor/single" class="btn btn-primary mt-3">开始体验</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 双人模式 -->
+        <div class="col-md-4">
+            <div class="card h-100 p-4 text-center">
+                <div class="card-body">
+                    <div class="display-1 text-info mb-3"><i class="fas fa-user-friends"></i></div>
+                    <h3 class="card-title">双人互动模式</h3>
+                    <p class="card-text text-muted">分析人际关系中的情绪共鸣与影响，解读亲密关系。</p>
+                    <a href="/monitor/double" class="btn btn-primary mt-3">开始体验</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 视频上传 -->
+        <div class="col-md-4">
+            <div class="card h-100 p-4 text-center">
+                <div class="card-body">
+                    <div class="display-1 text-success mb-3"><i class="fas fa-video"></i></div>
+                    <h3 class="card-title">视频文件分析</h3>
+                    <p class="card-text text-muted">上传本地视频，AI自动为您标注每一帧的情绪状态。</p>
+                    <a href="/upload_page" class="btn btn-primary mt-3">上传视频</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
