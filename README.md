@@ -13,7 +13,7 @@ api_double.py  双人模式下接入的llm数据分析
 upload_video.py  视频上传接口，只做label标注，不会产生报告（调用时直接加 --input+视频路径）  
 
 网页运行方法  
-命令行运行python app.py  
+命令行在code路径里运行python app.py  
 浏览器打开http://127.0.0.1:5000  
 
 api需要在系统变量里面配置  
